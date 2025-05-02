@@ -1,0 +1,43 @@
+const axios = require('axios');
+const AWS = require('aws-sdk');
+
+// Yahoo Finance API client
+const yahooFinanceApi = axios.create({
+  baseURL: 'https://yfapi.net',
+  timeout: 10000,
+  headers: {
+    'x-api-key': process.env.YAHOO_FINANCE_API_KEY,
+    'Content-Type': 'application/json'
+  }
+});
+
+// AWS SageMaker client setup
+AWS.config.update({
+  region: process.env.AWS_REGION || 'us-east-1',
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+});
+
+const sageMakerRuntime = new AWS.SageMakerRuntime();
+
+// Function to invoke SageMaker endpoint
+const invokeSageMaker = async (input) => {
+  const params = {
+    EndpointName: process.env.SAGEMAKER_ENDPOINT,
+    ContentType: 'application/json',
+    Body: JSON.stringify(input)
+  };
+
+  try {
+    const response = await sageMakerRuntime.invokeEndpoint(params).promise();
+    return JSON.parse(response.Body.toString());
+  } catch (error) {
+    console.error('Error invoking SageMaker endpoint:', error);
+    throw error;
+  }
+};
+
+module.exports = {
+  yahooFinanceApi,
+  invokeSageMaker
+};
