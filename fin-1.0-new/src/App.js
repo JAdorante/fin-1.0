@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import './App.css';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Alpaca API configuration
 const alpacaConfig = {
-  keyId: 'PKXU634IKLP01J57MXTF',
-  secretKey: 'p1bxJbkmxoxLrHgvNEoHVUre0Fey2716dWIAxtM8',
-  paper: true // Using paper trading account
+keyId: process.env.ALPACA_API_KEY_ID,
+secretKey: process.env.ALPACA_API_SECRET_KEY,
+paper: true
 };
 
 // API endpoints
