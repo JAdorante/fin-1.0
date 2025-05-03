@@ -1,6 +1,6 @@
 import React from 'react';
 import RiskReport from './RiskReport';
-import Disclaimer from '../common/Disclaimer';
+import Disclaimer from './Disclaimer';
 
 const PortfolioSummary = ({ portfolio }) => {
   if (!portfolio || !portfolio.holdings || portfolio.holdings.length === 0) {

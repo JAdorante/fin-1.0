@@ -1,45 +1,42 @@
-import axios from 'axios';
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+const axios = require('axios');
+const AWS = require('aws-sdk');
+const Alpaca = require('@alpacahq/alpaca-trade-api');
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+// Initialize Alpaca client with hardcoded keys for personal use
+const alpacaClient = new Alpaca({
+  keyId: 'PKXU634IKLP01J57MXTF',
+  secretKey: 'p1bxJbkmxoxLrHgvNEoHVUre0Fey2716dWIAxtM8',
+  paper: true, // Set to false for live trading when ready
+  baseUrl: 'https://paper-api.alpaca.markets'
+});
+
+// AWS SageMaker client setup (keeping this from the original implementation)
+AWS.config.update({
+  region: process.env.AWS_REGION || 'us-east-1',
+  accessKeyId: process.env.AKIAYUEI6HK6NBUGXD7E,
+  secretAccessKey: process.env.ENedxmOHSjaHLvpb2UacFNthd6bp0OWr5/tzPvC5
+});
+
+const sageMakerRuntime = new AWS.SageMakerRuntime();
+
+// Function to invoke SageMaker endpoint
+const invokeSageMaker = async (input) => {
+  const params = {
+    EndpointName: process.env.SAGEMAKER_ENDPOINT,
+    ContentType: 'application/json',
+    Body: JSON.stringify(input)
+  };
+
+  try {
+    const response = await sageMakerRuntime.invokeEndpoint(params).promise();
+    return JSON.parse(response.Body.toString());
+  } catch (error) {
+    console.error('Error invoking SageMaker endpoint:', error);
+    throw error;
+  }
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// API base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-// Create axios instance
-const api = axios.create({
-  baseURL: API_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add auth token to requests
-api.interceptors.request.use(async (config) => {
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
-
-export { api, auth, db };
+module.exports = {
+  alpacaClient,
+  invokeSageMaker
+};

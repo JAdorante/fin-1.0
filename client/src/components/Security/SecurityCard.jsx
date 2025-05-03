@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSecurityData } from '../../services/securityService';
-import Disclaimer from '../common/Disclaimer';
-import Loading from '../common/Loading';
+import Disclaimer from './Disclaimer';
+import Loading from './Loading';
 
 const SecurityCard = ({ ticker }) => {
   const [security, setSecurity] = useState(null);

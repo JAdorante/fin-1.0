@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { uploadPortfolio } from '../../services/portfolioService';
-import Disclaimer from '../common/Disclaimer';
+import Disclaimer from './Disclaimer';
 
 const PortfolioUpload = ({ onUploadComplete }) => {
   const [file, setFile] = useState(null);
