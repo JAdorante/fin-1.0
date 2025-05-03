@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import Disclaimer from '../common/Disclaimer';
+import Disclaimer from 'fin-1.0/client/public/src/components/common/Disclaimer';
 
 const Login = () => {
   const [email, setEmail] = useState('');

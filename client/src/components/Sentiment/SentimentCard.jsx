@@ -1,5 +1,5 @@
 import React from 'react';
-import Disclaimer from '../common/Disclaimer';
+import Disclaimer from '/common/Disclaimer';
 
 const SentimentCard = ({ sentiment }) => {
   if (!sentiment) {

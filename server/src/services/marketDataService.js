@@ -1,32 +1,77 @@
-const { yahooFinanceApi } = require('../utils/apiClients');
+const axios = require('axios');
+
+// Alpaca API configuration
+const alpacaConfig = {
+  baseURL: 'https://data.alpaca.markets/v2',
+  headers: {
+    'APCA-API-KEY-ID': 'PKXU634IKLP01J57MXTF',
+    'APCA-API-SECRET-KEY': 'p1bxJbkmxoxLrHgvNEoHVUre0Fey2716dWIAxtM8'
+  }
+};
+
+// Create Alpaca API client
+const alpacaApi = axios.create(alpacaConfig);
 
 // Get market summary
 const getMarketSummary = async () => {
   try {
-    // Use Yahoo Finance API for major indices
-    const response = await yahooFinanceApi.get(`/v6/finance/quote`, {
+    // Use Alpaca API for major indices - get latest bars for major indices
+    const symbols = 'SPY,DIA,QQQ,IWM'; // ETFs that track major indices
+    const response = await alpacaApi.get(`/stocks/bars/latest`, {
       params: {
-        symbols: '^GSPC,^DJI,^IXIC,^RUT'
+        symbols: symbols
       }
     });
     
-    const quoteData = response.data.quoteResponse.result;
+    const barData = response.data.bars;
     
-    if (!quoteData || quoteData.length === 0) {
-      return generateMockMarketSummary();
+    if (!barData || Object.keys(barData).length === 0) {
+      throw new Error('No market data available from Alpaca');
     }
     
-    // Format indices data
-    const indices = quoteData.map(index => ({
-      name: getIndexName(index.symbol),
-      symbol: index.symbol,
-      value: index.regularMarketPrice,
-      change: index.regularMarketChangePercent,
-      previousClose: index.regularMarketPreviousClose
-    }));
+    // Get previous day's data for calculating change
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayISO = yesterday.toISOString().split('T')[0];
     
-    // For MVP, we're using mocked headlines and sentiment
-    const headlines = getMockHeadlines();
+    const previousResponse = await alpacaApi.get(`/stocks/bars/day`, {
+      params: {
+        symbols: symbols,
+        start: yesterdayISO,
+        limit: 1
+      }
+    });
+    
+    const previousData = previousResponse.data.bars;
+    
+    // Format indices data
+    const indices = Object.keys(barData).map(symbol => {
+      const bar = barData[symbol];
+      const previousBar = previousData[symbol] ? previousData[symbol][0] : null;
+      const previousClose = previousBar ? previousBar.c : bar.o;
+      const change = ((bar.c - previousClose) / previousClose) * 100;
+      
+      return {
+        name: getIndexName(symbol),
+        symbol: symbol,
+        value: bar.c,
+        change: change,
+        previousClose: previousClose
+      };
+    });
+    
+    // Get market news using Alpaca News API
+    const newsResponse = await alpacaApi.get(`/news`, {
+      params: {
+        limit: 5
+      }
+    });
+    
+    const headlines = newsResponse.data.map(news => ({
+      title: news.headline,
+      source: news.source
+    })).slice(0, 3);
+    
     const sentiment = determineMarketSentiment(indices);
     
     return {
@@ -38,28 +83,51 @@ const getMarketSummary = async () => {
   } catch (error) {
     console.error('Error fetching market summary:', error);
     
-    // Return mock data if API fails
-    return generateMockMarketSummary();
+    // Re-throw error instead of falling back to mock data
+    throw new Error(`Failed to get market data: ${error.message}`);
   }
 };
 
 // Get market news
 const getMarketNews = async () => {
-  // For MVP, we're returning mocked news
-  // In a real implementation, this would use a news API
-  return {
-    headlines: getMockHeadlines(),
-    asOf: new Date().toISOString()
-  };
+  try {
+    // Use Alpaca News API
+    const response = await alpacaApi.get(`/news`, {
+      params: {
+        limit: 10
+      }
+    });
+    
+    if (!response.data || response.data.length === 0) {
+      throw new Error('No news data available from Alpaca');
+    }
+    
+    const headlines = response.data.map(news => ({
+      title: news.headline,
+      source: news.source,
+      url: news.url,
+      summary: news.summary
+    })).slice(0, 5);
+    
+    return {
+      headlines,
+      asOf: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error fetching market news:', error);
+    
+    // Re-throw error instead of falling back to mock data
+    throw new Error(`Failed to get market news: ${error.message}`);
+  }
 };
 
 // Helper to get index name
 const getIndexName = (symbol) => {
   const indexNames = {
-    '^GSPC': 'S&P 500',
-    '^DJI': 'Dow Jones',
-    '^IXIC': 'NASDAQ',
-    '^RUT': 'Russell 2000'
+    'SPY': 'S&P 500',
+    'DIA': 'Dow Jones',
+    'QQQ': 'NASDAQ',
+    'IWM': 'Russell 2000'
   };
   
   return indexNames[symbol] || symbol;
@@ -67,9 +135,9 @@ const getIndexName = (symbol) => {
 
 // Determine market sentiment based on indices
 const determineMarketSentiment = (indices) => {
-  // Simple algorithm to determine overall market sentiment
-  const sp500 = indices.find(index => index.symbol === '^GSPC');
-  const nasdaq = indices.find(index => index.symbol === '^IXIC');
+  // Algorithm to determine overall market sentiment based on real data
+  const sp500 = indices.find(index => index.symbol === 'SPY');
+  const nasdaq = indices.find(index => index.symbol === 'QQQ');
   
   if (!sp500 || !nasdaq) return 'Neutral';
   
@@ -80,68 +148,6 @@ const determineMarketSentiment = (indices) => {
   if (averageChange < -1) return 'Bearish';
   if (averageChange < -0.3) return 'Slightly Bearish';
   return 'Neutral';
-};
-
-// Generate mock market headlines
-const getMockHeadlines = () => {
-  const headlines = [
-    { title: 'Tech stocks rally on AI optimism', source: 'Financial Times' },
-    { title: 'Fed signals potential interest rate cuts later this year', source: 'Wall Street Journal' },
-    { title: 'Retail sales beat expectations, consumer spending remains strong', source: 'Bloomberg' },
-    { title: 'Oil prices fall amid demand concerns', source: 'Reuters' },
-    { title: 'Earnings season shows resilience in corporate America', source: 'CNBC' }
-  ];
-  
-  // Return 3 random headlines
-  return headlines.sort(() => 0.5 - Math.random()).slice(0, 3);
-};
-
-// Generate mock market summary (fallback)
-const generateMockMarketSummary = () => {
-  // Generate random changes
-  const spChange = (Math.random() * 2) - 0.5; // Random between -0.5% and 1.5%
-  const dowChange = (Math.random() * 2) - 0.5;
-  const nasdaqChange = (Math.random() * 2) - 0.5;
-  const russellChange = (Math.random() * 2) - 0.5;
-  
-  // Generate mock indices
-  const indices = [
-    {
-      name: 'S&P 500',
-      symbol: '^GSPC',
-      value: 4500 + (Math.random() * 200 - 100),
-      change: spChange,
-      previousClose: 4500
-    },
-    {
-      name: 'Dow Jones',
-      symbol: '^DJI',
-      value: 36000 + (Math.random() * 1000 - 500),
-      change: dowChange,
-      previousClose: 36000
-    },
-    {
-      name: 'NASDAQ',
-      symbol: '^IXIC',
-      value: 14000 + (Math.random() * 700 - 350),
-      change: nasdaqChange,
-      previousClose: 14000
-    },
-    {
-      name: 'Russell 2000',
-      symbol: '^RUT',
-      value: 2000 + (Math.random() * 100 - 50),
-      change: russellChange,
-      previousClose: 2000
-    }
-  ];
-  
-  return {
-    indices,
-    headlines: getMockHeadlines(),
-    sentiment: determineMarketSentiment(indices),
-    asOf: new Date().toISOString()
-  };
 };
 
 module.exports = {
